@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PJM Advanced Energy Analytics Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0f1c;
+            color: #e0e6ed;
+            overflow-x: hidden;
+        }
+
+        .dashboard {
+            padding: 20px;
+            max-width: 2000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 15s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px;
+            background: rgba(0,255,136,0.2);
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .market-status {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #00d4ff, #0099ff, #00d4ff);
+            background-size: 200% 100%;
+            animation: gradient 3s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .metric-card.alert {
+            background: linear-gradient(135deg, #ff4757 0%, #ff6348 100%);
+        }
+
+        .metric-card.warning {
+            background: linear-gradient(135deg, #ff9f43 0%, #ffb142 100%);
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: #8892b0;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .metric-change {
+            font-size: 0.85em;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .metric-change.positive {
+            color: #00ff88;
+        }
+
+        .metric-change.negative {
+            color: #ff4757;
+        }
+
+        .chart-container {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .chart-title {
+            font-size: 1.4em;
+            font-weight: 600;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #0099ff 0%, #00d4ff 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.9em;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,153,255,0.3);
+        }
+
+        .btn.secondary {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .btn.active {
+            background: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
+        }
+
+        canvas {
+            max-height: 400px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .predictions-section {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            margin-bottom: 25px;
+        }
+
+        .recommendation-card {
+            background: rgba(0,217,255,0.1);
+            border: 1px solid rgba(0,217,255,0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+
+        .recommendation-card h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+
+        .recommendation-item {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .recommendation-item:last-child {
+            border-bottom: none;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #00d4ff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .forecast-card {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .forecast-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-3px);
+        }
+
+        .forecast-year {
+            font-size: 0.9em;
+            color: #8892b0;
+            margin-bottom: 5px;
+        }
+
+        .forecast-price {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+
+        .alert-section {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            padding: 25px;
+            border-radius: 20px;
+            margin-bottom: 25px;
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ff4757;
+        }
+
+        .alert-item.warning {
+            border-left-color: #ff9f43;
+        }
+
+        .alert-item.info {
+            border-left-color: #00d4ff;
+        }
+
+        .alert-icon {
+            font-size: 1.5em;
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-time {
+            font-size: 0.85em;
+            color: #8892b0;
+        }
+
+        .zone-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .zone-card {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .zone-card:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
+        }
+
+        .zone-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #00d4ff;
+        }
+
+        .zone-price {
+            font-size: 1.2em;
+            margin-bottom: 5px;
+        }
+
+        .zone-components {
+            font-size: 0.85em;
+            color: #8892b0;
+        }
+
+        .error-message {
+            background: rgba(255,71,87,0.2);
+            border: 1px solid rgba(255,71,87,0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            color: #ff4757;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .grid-2, .grid-3 {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <div class="header-content">
+                <div>
+                    <h1>PJM Advanced Energy Analytics Dashboard</h1>
+                    <p>PJM Interconnection Market Intelligence & AI-Powered Predictions</p>
+                </div>
+                <div class="header-stats">
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <span>Live Data</span>
+                    </div>
+                    <div class="market-status" id="marketStatus">Market: LOADING</div>
+                    <div class="market-status">
+                        <span id="currentTime">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enhanced Metrics Section -->
+        <div class="metrics-grid" id="metricsGrid">
+            <div class="metric-card">
+                <div class="metric-label">Current RT LMP</div>
+                <div class="metric-value" id="currentPrice">Loading...</div>
+                <div class="metric-change" id="currentPriceChange">
+                    <span>-</span>
+                    <span>Loading</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Day-Ahead Avg</div>
+                <div class="metric-value" id="dayAheadAvg">Loading...</div>
+                <div class="metric-change" id="dayAheadChange">
+                    <span>-</span>
+                    <span>Loading</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Peak Hour Price</div>
+                <div class="metric-value" id="peakPrice">Loading...</div>
+                <div class="metric-change" id="peakPriceChange">
+                    <span>-</span>
+                    <span>Loading</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">System Load</div>
+                <div class="metric-value" id="systemLoad">Loading...</div>
+                <div class="metric-change" id="systemLoadChange">
+                    <span>-</span>
+                    <span>Loading</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Recommendations Section -->
+        <div class="recommendation-card">
+            <h3>🤖 AI-Powered Strategic Recommendations</h3>
+            <div id="aiRecommendations">
+                <div class="loading-spinner"></div>
+                <span style="margin-left: 10px;">Loading AI recommendations...</span>
+            </div>
+        </div>
+
+        <!-- Long-term Forecasts -->
+        <div class="predictions-section">
+            <h2 class="chart-title">5-Year Price Forecasts</h2>
+            <div class="forecast-grid" id="forecastGrid">
+                <div class="loading-spinner"></div>
+                <span style="margin-left: 10px;">Loading forecasts...</span>
+            </div>
+        </div>
+
+        <!-- Main Charts -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <h2 class="chart-title">Real-Time vs Day-Ahead LMP</h2>
+                <div class="chart-controls">
+                    <button class="btn active" onclick="updateTimeRange('24h')">24H</button>
+                    <button class="btn" onclick="updateTimeRange('7d')">7D</button>
+                    <button class="btn" onclick="updateTimeRange('30d')">30D</button>
+                </div>
+            </div>
+            <canvas id="priceChart"></canvas>
+        </div>
+
+        <div class="grid-2">
+            <!-- Zone-wise LMP -->
+            <div class="chart-container">
+                <h2 class="chart-title">Zone-wise LMP (Real-Time)</h2>
+                <div id="zoneData">
+                    <div class="loading-spinner"></div>
+                    <span style="margin-left: 10px;">Loading zone data...</span>
+                </div>
+            </div>
+
+            <!-- Risk Metrics -->
+            <div class="chart-container">
+                <h2 class="chart-title">Risk Metrics Dashboard</h2>
+                <div class="metrics-grid" id="riskMetrics">
+                    <div class="loading-spinner"></div>
+                    <span style="margin-left: 10px;">Loading risk metrics...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Load and Generation -->
+        <div class="chart-container">
+            <h2 class="chart-title">System Load & Generation Mix</h2>
+            <canvas id="loadChart"></canvas>
+        </div>
+
+        <!-- Predictions Chart -->
+        <div class="chart-container">
+            <h2 class="chart-title">Short-term LMP Predictions (Next 24 Hours)</h2>
+            <canvas id="predictionChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let priceChart, loadChart, predictionChart;
+        const API_BASE = '/api/pjm';
+        
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDashboard();
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+            setInterval(refreshData, 300000); // Refresh every 5 minutes
+        });
+
+        function initializeDashboard() {
+            console.log('Initializing PJM Dashboard...');
+            loadMarketSummary();
+            loadAIRecommendations();
+            loadLongTermForecasts();
+            loadZoneData();
+            loadRiskMetrics();
+            initializeCharts();
+        }
+
+        function updateCurrentTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = 
+                now.toLocaleTimeString('en-US', { 
+                    timeZone: 'America/New_York',
+                    hour12: false 
+                }) + ' EST';
+        }
+
+        async function loadMarketSummary() {
+            try {
+                const response = await fetch(`${API_BASE}/market-summary`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    updateMetrics(data.data);
+                    document.getElementById('marketStatus').textContent = 
+                        `Market: ${data.data.market_status}`;
+                } else {
+                    console.error('Market summary error:', data.message);
+                    showError('Failed to load market summary');
+                }
+            } catch (error) {
+                console.error('Error loading market summary:', error);
+                showError('Failed to connect to market data');
+            }
+        }
+
+        function updateMetrics(data) {
+            // Update current price
+            document.getElementById('currentPrice').textContent = 
+                `$${data.real_time_avg_lmp.toFixed(2)}`;
+            
+            // Update day-ahead average
+            document.getElementById('dayAheadAvg').textContent = 
+                `$${data.day_ahead_avg_lmp.toFixed(2)}`;
+            
+            // Update peak price
+            document.getElementById('peakPrice').textContent = 
+                `$${data.peak_hour_price.toFixed(2)}`;
+            
+            // Update system load
+            document.getElementById('systemLoad').textContent = 
+                `${data.current_load.toFixed(1)} GW`;
+
+            // Calculate and show changes (placeholder logic)
+            const rtChange = ((data.real_time_avg_lmp - data.day_ahead_avg_lmp) / data.day_ahead_avg_lmp * 100);
+            updateChangeIndicator('currentPriceChange', rtChange);
+        }
+
+        function updateChangeIndicator(elementId, changePercent) {
+            const element = document.getElementById(elementId);
+            const isPositive = changePercent > 0;
+            
+            element.className = `metric-change ${isPositive ? 'positive' : 'negative'}`;
+            element.innerHTML = `
+                <span>${isPositive ? '↑' : '↓'}</span>
+                <span>${Math.abs(changePercent).toFixed(1)}%</span>
+            `;
+        }
+
+        async function loadAIRecommendations() {
+            try {
+                const response = await fetch(`${API_BASE}/ai-recommendations`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayRecommendations(data.recommendations);
+                } else {
+                    console.error('AI recommendations error:', data.message);
+                    document.getElementById('aiRecommendations').innerHTML = 
+                        '<div class="error-message">Failed to load AI recommendations</div>';
+                }
+            } catch (error) {
+                console.error('Error loading AI recommendations:', error);
+                document.getElementById('aiRecommendations').innerHTML = 
+                    '<div class="error-message">Failed to connect to AI service</div>';
+            }
+        }
+
+        function displayRecommendations(recommendations) {
+            const container = document.getElementById('aiRecommendations');
+            
+            if (!recommendations || recommendations.length === 0) {
+                container.innerHTML = '<p>No recommendations available at this time.</p>';
+                return;
+            }
+
+            container.innerHTML = recommendations.map(rec => `
+                <div class="recommendation-item">
+                    <span>${rec.icon || '💡'}</span>
+                    <div>
+                        <strong>${rec.title}:</strong> ${rec.description}
+                        <div style="margin-top: 5px; font-size: 0.9em; color: #8892b0;">
+                            Action: ${rec.action} | Potential: ${rec.potential_savings || rec.potential_revenue || 'TBD'}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadLongTermForecasts() {
+            try {
+                const response = await fetch(`${API_BASE}/long-term-forecast`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayForecasts(data.forecasts);
+                } else {
+                    console.error('Long-term forecast error:', data.message);
+                    document.getElementById('forecastGrid').innerHTML = 
+                        '<div class="error-message">Failed to load forecasts</div>';
+                }
+            } catch (error) {
+                console.error('Error loading forecasts:', error);
+                document.getElementById('forecastGrid').innerHTML = 
+                    '<div class="error-message">Failed to connect to forecast service</div>';
+            }
+        }
+
+        function displayForecasts(forecasts) {
+            const container = document.getElementById('forecastGrid');
+            
+            if (!forecasts || forecasts.length === 0) {
+                container.innerHTML = '<p>No forecast data available.</p>';
+                return;
+            }
+
+            container.innerHTML = forecasts.map(forecast => `
+                <div class="forecast-card">
+                    <div class="forecast-year">${forecast.year}</div>
+                    <div class="forecast-price">$${forecast.forecast_price}</div>
+                    <div style="font-size: 0.8em; color: #8892b0; margin-top: 5px;">
+                        Range: $${forecast.confidence_interval.lower} - $${forecast.confidence_interval.upper}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function loadZoneData() {
+            try {
+                const response = await fetch(`${API_BASE}/zone-wise-lmp`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayZoneData(data.data);
+                } else {
+                    console.error('Zone data error:', data.message);
+                    document.getElementById('zoneData').innerHTML = 
+                        '<div class="error-message">Failed to load zone data</div>';
+                }
+            } catch (error) {
+                console.error('Error loading zone data:', error);
+                document.getElementById('zoneData').innerHTML = 
+                    '<div class="error-message">Failed to connect to zone data service</div>';
+            }
+        }
+
+        function displayZoneData(zoneData) {
+            const container = document.getElementById('zoneData');
+            
+            if (!zoneData || Object.keys(zoneData).length === 0) {
+                container.innerHTML = '<p>No zone data available.</p>';
+                return;
+            }
+
+            const zoneCards = Object.entries(zoneData).map(([zone, data]) => `
+                <div class="zone-card">
+                    <div class="zone-name">${zone}</div>
+                    <div class="zone-price">$${data.lmp.toFixed(2)}</div>
+                    <div class="zone-components">
+                        Energy: $${data.energy.toFixed(2)} | 
+                        Congestion: $${data.congestion.toFixed(2)} | 
+                        Loss: $${data.loss.toFixed(2)}
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = `<div class="zone-grid">${zoneCards}</div>`;
+        }
+
+        async function loadRiskMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/risk-metrics`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayRiskMetrics(data.risk_metrics);
+                } else {
+                    console.error('Risk metrics error:', data.message);
+                    document.getElementById('riskMetrics').innerHTML = 
+                        '<div class="error-message">Failed to load risk metrics</div>';
+                }
+            } catch (error) {
+                console.error('Error loading risk metrics:', error);
+                document.getElementById('riskMetrics').innerHTML = 
+                    '<div class="error-message">Failed to connect to risk service</div>';
+            }
+        }
+
+        function displayRiskMetrics(metrics) {
+            const container = document.getElementById('riskMetrics');
+            
+            container.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-label">VaR (95%)</div>
+                    <div class="metric-value" style="font-size: 1.5em;">$${metrics.var_95}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">CVaR</div>
+                    <div class="metric-value" style="font-size: 1.5em;">$${metrics.cvar_95}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Volatility</div>
+                    <div class="metric-value" style="font-size: 1.5em;">${metrics.volatility}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Sharpe Ratio</div>
+                    <div class="metric-value" style="font-size: 1.5em;">${metrics.sharpe_ratio}</div>
+                </div>
+            `;
+        }
+
+        function initializeCharts() {
+            initializePriceChart();
+            initializeLoadChart();
+            initializePredictionChart();
+        }
+
+        function initializePriceChart() {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Real-Time LMP',
+                        data: [],
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Day-Ahead LMP',
+                        data: [],
+                        borderColor: '#00ff88',
+                        backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e0e6ed' }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#8892b0' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#8892b0' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+            
+            loadPriceChartData();
+        }
+
+        function initializeLoadChart() {
+            const ctx = document.getElementById('loadChart').getContext('2d');
+            loadChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'System Load (GW)',
+                        data: [],
+                        borderColor: '#ff9f43',
+                        backgroundColor: 'rgba(255, 159, 67, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e0e6ed' }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#8892b0' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#8892b0' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+            
+            loadLoadChartData();
+        }
+
+        function initializePredictionChart() {
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            predictionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Historical LMP',
+                        data: [],
+                        borderColor: '#8892b0',
+                        backgroundColor: 'rgba(136, 146, 176, 0.1)',
+                        tension: 0.4
+                    }, {
+                        label: 'Predicted LMP',
+                        data: [],
+                        borderColor: '#ff4757',
+                        backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                        borderDash: [5, 5],
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e0e6ed' }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            ticks: { color: '#8892b0' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        y: { 
+                            ticks: { color: '#8892b0' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+            
+            loadPredictionChartData();
+        }
+
+        async function loadPriceChartData() {
+            try {
+                const [rtResponse, daResponse] = await Promise.all([
+                    fetch(`${API_BASE}/real-time-lmp?hours_back=24`),
+                    fetch(`${API_BASE}/day-ahead-lmp?days_ahead=1`)
+                ]);
+                
+                const rtData = await rtResponse.json();
+                const daData = await daResponse.json();
+                
+                if (rtData.status === 'success' && rtData.data) {
+                    const rtPrices = rtData.data.slice(-24).map(d => ({
+                        x: new Date(d.Time || d.timestamp),
+                        y: d.LMP || 0
+                    }));
+                    
+                    priceChart.data.datasets[0].data = rtPrices;
+                    priceChart.data.labels = rtPrices.map(d => d.x.toLocaleTimeString());
+                }
+                
+                if (daData.status === 'success' && daData.data) {
+                    const daPrices = daData.data.slice(-24).map(d => ({
+                        x: new Date(d.Time || d.timestamp),
+                        y: d.LMP || 0
+                    }));
+                    
+                    priceChart.data.datasets[1].data = daPrices;
+                }
+                
+                priceChart.update();
+            } catch (error) {
+                console.error('Error loading price chart data:', error);
+            }
+        }
+
+        async function loadLoadChartData() {
+            try {
+                const response = await fetch(`${API_BASE}/load-data?hours_back=24`);
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.data) {
+                    const loadData = data.data.slice(-24).map(d => ({
+                        x: new Date(d.Time || d.timestamp),
+                        y: d.Load || 0
+                    }));
+                    
+                    loadChart.data.datasets[0].data = loadData;
+                    loadChart.data.labels = loadData.map(d => d.x.toLocaleTimeString());
+                    loadChart.update();
+                }
+            } catch (error) {
+                console.error('Error loading load chart data:', error);
+            }
+        }
+
+        async function loadPredictionChartData() {
+            try {
+                const [historicalResponse, predictionResponse] = await Promise.all([
+                    fetch(`${API_BASE}/real-time-lmp?hours_back=24`),
+                    fetch(`${API_BASE}/predict-lmp?hours_ahead=24`)
+                ]);
+                
+                const historicalData = await historicalResponse.json();
+                const predictionData = await predictionResponse.json();
+                
+                if (historicalData.status === 'success' && historicalData.data) {
+                    const historical = historicalData.data.slice(-12).map(d => ({
+                        x: new Date(d.Time || d.timestamp),
+                        y: d.LMP || 0
+                    }));
+                    
+                    predictionChart.data.datasets[0].data = historical;
+                }
+                
+                if (predictionData.status === 'success' && predictionData.predictions) {
+                    const predictions = predictionData.predictions.map(d => ({
+                        x: new Date(d.timestamp),
+                        y: d.predicted_lmp
+                    }));
+                    
+                    predictionChart.data.datasets[1].data = predictions;
+                    
+                    // Combine labels
+                    const allTimes = [
+                        ...predictionChart.data.datasets[0].data.map(d => d.x),
+                        ...predictions.map(d => d.x)
+                    ];
+                    predictionChart.data.labels = allTimes.map(t => t.toLocaleTimeString());
+                }
+                
+                predictionChart.update();
+            } catch (error) {
+                console.error('Error loading prediction chart data:', error);
+            }
+        }
+
+        function refreshData() {
+            console.log('Refreshing dashboard data...');
+            loadMarketSummary();
+            loadZoneData();
+            loadPriceChartData();
+            loadLoadChartData();
+        }
+
+        function updateTimeRange(range) {
+            // Update active button
+            document.querySelectorAll('.chart-controls .btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update chart data based on range
+            let hoursBack = 24;
+            switch(range) {
+                case '7d': hoursBack = 168; break;
+                case '30d': hoursBack = 720; break;
+                default: hoursBack = 24;
+            }
+            
+            loadPriceChartData(hoursBack);
+        }
+
+        function showError(message) {
+            console.error(message);
+            // Could implement toast notifications here
+        }
+    </script>
+</body>
+</html>
+
