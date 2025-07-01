@@ -8,3 +8,4 @@ healthcheckTimeout = 100
 
 [env]
 PORT = "5000"
+FLASK_ENV = "production"
